@@ -84,7 +84,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${POSTGRES_DB}"]
       interval: 30s
@@ -96,10 +95,12 @@ services:
         condition: on-failure
     stdin_open: true
     tty: true
+    ports:
+      - "5432:5432"
     networks:
       - kong-net
-    # volumes:
-    #   - kong_data:/var/lib/postgresql/data
+    volumes:
+      - kong_data:/var/lib/postgresql/data
 
   konga-prepare:
     container_name: konga-prepare
@@ -129,3 +130,51 @@ services:
       - db
     ports:
       - "1337:1337"
+
+  # blog-user:
+  #   build:
+  #     context: ../blog-user
+  #     dockerfile: Dockerfile
+  #     args:
+  #       port: 2266
+  #   container_name: blog-user
+  #   command: npm run start:dev && yarn mig:run
+  #   ports:
+  #     - "2266:2266"
+  #   environment:
+  #     DB_DEFAULT_PASSWORD: kong
+  #     DB_DEFAULT_USERNAME: kong
+  #     DB_DEFAULT_DATABASE: blog-user
+  #     DB_DEFAULT_TYPE: postgres
+  #     DB_DEFAULT_HOST: db
+  #     DB_DEFAULT_PORT: 5432
+  #     API_PORT: 2266
+  #     NODE_ENV: DEV
+  #   networks:
+  #     - kong-net
+  #   depends_on:
+  #     - db
+
+  # blog-article:
+  #   build:
+  #     context: ../blog-article
+  #     dockerfile: Dockerfile
+  #     args:
+  #       port: 6622
+  #   container_name: blog-article
+  #   command: npm run start:dev && yarn mig:run
+  #   ports:
+  #     - "6622:6622"
+  #   environment:
+  #     DB_DEFAULT_PASSWORD: kong
+  #     DB_DEFAULT_USERNAME: kong
+  #     DB_DEFAULT_DATABASE: blog-article
+  #     DB_DEFAULT_TYPE: postgres
+  #     DB_DEFAULT_HOST: db
+  #     DB_DEFAULT_PORT: 5432
+  #     API_PORT: 6622
+  #     NODE_ENV: DEV
+  #   networks:
+  #     - kong-net
+  #   depends_on:
+  #     - db
