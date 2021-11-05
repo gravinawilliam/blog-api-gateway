@@ -4,11 +4,12 @@ volumes:
   kong_data: {}
 
 networks:
-  kong-net:
+  blog-net:
     external: true
 
 services:
   kong-migrations:
+    container_name: kong-migrations
     image: "kong:2.3.2-alpine"
     command: kong migrations bootstrap
     depends_on:
@@ -20,13 +21,14 @@ services:
       KONG_PG_USER: ${POSTGRES_USER}
       KONG_PG_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
-      - kong-net
+      - blog-net
     restart: on-failure
     deploy:
       restart_policy:
         condition: on-failure
 
   kong-migrations-up:
+    container_name: kong-migrations-up
     image: "kong:2.3.2-alpine"
     command: kong migrations up && kong migrations finish
     depends_on:
@@ -38,13 +40,14 @@ services:
       KONG_PG_USER: ${KONG_PG_USER}
       KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
     networks:
-      - kong-net
+      - blog-net
     restart: on-failure
     deploy:
       restart_policy:
         condition: on-failure
 
   kong:
+    container_name: kong
     image: "kong:2.3.2-alpine"
     user: "kong"
     depends_on:
@@ -62,7 +65,7 @@ services:
       KONG_PROXY_ERROR_LOG: ${KONG_PROXY_ERROR_LOG}
       KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
     networks:
-      - kong-net
+      - blog-net
     ports:
       - "8000:8000/tcp"
       - "127.0.0.1:8001:8001/tcp"
@@ -79,35 +82,27 @@ services:
         condition: on-failure
 
   db:
-    image: postgres:9.5
+    container_name: db
+    image: 'bitnami/postgresql:latest'
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-    restart: on-failure
-    deploy:
-      restart_policy:
-        condition: on-failure
-    stdin_open: true
-    tty: true
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRESQL_USERNAME: ${POSTGRES_USER}
+      POSTGRESQL_DATABASE: ${POSTGRES_DB}
+      POSTGRESQL_TIMEZONE: America/SAO_PAULO
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
+    restart: on-failure
     networks:
-      - kong-net
+      - blog-net
     volumes:
       - kong_data:/var/lib/postgresql/data
 
   konga-prepare:
     container_name: konga-prepare
     image: pantsel/konga:latest
-    command: "-c prepare -a postgres -u postgresql://kong:kong@db:5432/konga_db"
+    command: "-c prepare -a postgres -u postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$DB_HOST:5432/$DB_DATABASE"
     networks:
-      - kong-net
+      - blog-net
     restart: on-failure
     depends_on:
       - db
@@ -117,7 +112,7 @@ services:
     image: pantsel/konga:latest
     restart: always
     networks:
-      - kong-net
+      - blog-net
     environment:
       DB_ADAPTER: ${DB_ADAPTER}
       DB_HOST: ${DB_HOST}
@@ -131,50 +126,25 @@ services:
     ports:
       - "1337:1337"
 
-  # blog-user:
-  #   build:
-  #     context: ../blog-user
-  #     dockerfile: Dockerfile
-  #     args:
-  #       port: 2266
-  #   container_name: blog-user
-  #   command: npm run start:dev && yarn mig:run
-  #   ports:
-  #     - "2266:2266"
-  #   environment:
-  #     DB_DEFAULT_PASSWORD: kong
-  #     DB_DEFAULT_USERNAME: kong
-  #     DB_DEFAULT_DATABASE: blog-user
-  #     DB_DEFAULT_TYPE: postgres
-  #     DB_DEFAULT_HOST: db
-  #     DB_DEFAULT_PORT: 5432
-  #     API_PORT: 2266
-  #     NODE_ENV: DEV
-  #   networks:
-  #     - kong-net
-  #   depends_on:
-  #     - db
+  sonarqube:
+    container_name: sonarqube
+    image:  sonarqube:latest
+    networks:
+      - blog-net
+    ports:
+      - "${SONAR_PORT}:${SONAR_PORT}"
+      -  "9092:9092"
 
-  # blog-article:
-  #   build:
-  #     context: ../blog-article
-  #     dockerfile: Dockerfile
-  #     args:
-  #       port: 6622
-  #   container_name: blog-article
-  #   command: npm run start:dev && yarn mig:run
-  #   ports:
-  #     - "6622:6622"
-  #   environment:
-  #     DB_DEFAULT_PASSWORD: kong
-  #     DB_DEFAULT_USERNAME: kong
-  #     DB_DEFAULT_DATABASE: blog-article
-  #     DB_DEFAULT_TYPE: postgres
-  #     DB_DEFAULT_HOST: db
-  #     DB_DEFAULT_PORT: 5432
-  #     API_PORT: 6622
-  #     NODE_ENV: DEV
-  #   networks:
-  #     - kong-net
-  #   depends_on:
-  #     - db
+  mongodb:
+    container_name: mongodb
+    image: 'bitnami/mongodb:latest'
+    environment:
+      MONGODB_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGODB_ROOT_USER : ${MONGODB_ROOT_USER}
+    restart: on-failure
+    ports:
+      - "${MONGODB_PORT}:${MONGODB_PORT}"
+    networks:
+      - blog-net
